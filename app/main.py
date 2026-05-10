@@ -69,7 +69,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         device_id: str | None = Form(None),
     ) -> dict[str, str | int | None]:
         if start_ms < 0 or end_ms < 0 or end_ms <= start_ms:
-            raise HTTPException(status_code=400, detail="Invalid chunk time range")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Chunk time range must be non-negative and "
+                    "end_ms must be greater than start_ms"
+                ),
+            )
 
         session = get_session(settings.sqlite_path, session_id=session_id)
         if not session:
