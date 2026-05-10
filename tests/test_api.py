@@ -73,3 +73,17 @@ def test_upload_to_missing_session_returns_404(tmp_path: Path) -> None:
     )
 
     assert upload_response.status_code == 404
+
+
+def test_upload_negative_time_range_returns_400(tmp_path: Path) -> None:
+    client = build_client(tmp_path)
+    create_session_response = client.post("/v1/sessions")
+    session_id = create_session_response.json()["session_id"]
+
+    upload_response = client.post(
+        f"/v1/sessions/{session_id}/chunks",
+        data={"start_ms": "-1", "end_ms": "100", "source": "wearable"},
+        files={"file": ("chunk.wav", b"abc123", "audio/wav")},
+    )
+
+    assert upload_response.status_code == 400
