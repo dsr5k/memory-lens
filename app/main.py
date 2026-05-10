@@ -68,7 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         source: str = Form(...),
         device_id: str | None = Form(None),
     ) -> dict[str, str | int | None]:
-        if start_ms < 0 or end_ms < 0 or end_ms < start_ms:
+        if start_ms < 0 or end_ms < 0 or end_ms <= start_ms:
             raise HTTPException(status_code=400, detail="Invalid chunk time range")
 
         session = get_session(settings.sqlite_path, session_id=session_id)
