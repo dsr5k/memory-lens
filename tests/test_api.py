@@ -101,3 +101,20 @@ def test_upload_zero_duration_chunk_returns_400(tmp_path: Path) -> None:
     )
 
     assert upload_response.status_code == 400
+
+
+def test_upload_sanitizes_filename(tmp_path: Path) -> None:
+    client = build_client(tmp_path)
+    create_session_response = client.post("/v1/sessions")
+    session_id = create_session_response.json()["session_id"]
+
+    upload_response = client.post(
+        f"/v1/sessions/{session_id}/chunks",
+        data={"start_ms": "0", "end_ms": "100", "source": "wearable"},
+        files={"file": ("../weird name?.wav", b"abc123", "audio/wav")},
+    )
+
+    assert upload_response.status_code == 200
+    chunk_name = Path(upload_response.json()["file_path"]).name
+    assert ".." not in chunk_name
+    assert " " not in chunk_name

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -26,6 +27,12 @@ def utc_now_iso() -> str:
 def process_chunk(db_path: Path, chunk_id: str, delay_seconds: float) -> None:
     time.sleep(delay_seconds)
     update_chunk_status(db_path, chunk_id, status="processed", updated_at=utc_now_iso())
+
+
+def sanitize_filename(filename: str) -> str:
+    safe_name = Path(filename).name.strip()
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", safe_name)
+    return safe_name or "chunk.bin"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -83,7 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         chunk_id = str(uuid.uuid4())
         now = utc_now_iso()
-        safe_filename = Path(file.filename or "chunk.bin").name
+        safe_filename = sanitize_filename(file.filename or "chunk.bin")
         chunk_filename = f"{chunk_id}_{safe_filename}"
         session_upload_dir = settings.uploads_dir / session_id
         session_upload_dir.mkdir(parents=True, exist_ok=True)

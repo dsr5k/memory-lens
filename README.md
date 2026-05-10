@@ -64,6 +64,7 @@ make test
 - [ ] Create CloudWatch log group `/ecs/memory-lens-backend-service`.
 - [ ] Create task execution role (`ecsTaskExecutionRole`) and application task role.
 - [ ] Update `.aws/task-definition.json` placeholders (`<AWS_ACCOUNT_ID>`, `<FRONTEND_ORIGINS>`), role ARNs, and any env/logging values as needed (`ALLOWED_ORIGINS` should be real frontend origins in production).
+- [ ] Review `.aws/task-definition.json` compute defaults (`cpu: 256`, `memory: 512`) and increase them based on expected workload.
 
 ### GitHub OIDC setup
 
