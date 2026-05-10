@@ -1,378 +1,107 @@
-Memory Lens — COMPLETE IDEA OVERVIEW
-CORE VISION
-
-Memory Lens is:
-
-an AI-powered passive memory ecosystem
-
-where:
-
-wearable hardware captures real-world learning
-software converts it into structured intelligence
-AI filters irrelevant conversations
-users get searchable memory, notes, and revision systems automatically
-THE MAIN PHILOSOPHY
-
-The user should:
-
-NEVER feel like they are “using” a product.
-
-Instead:
-the system should feel:
-
-ambient
-invisible
-automatic
-wearable
-frictionless
-
-Like:
-
-AirPods
-smartwatch
-smart ring
-
-NOT:
-
-recorder
-gadget
-carrying device
-COMPLETE ECOSYSTEM
-1. HARDWARE LAYER
-
-(The Capture Layer)
+# Memory Lens MVP Backend
+
+Minimal backend foundation for Memory Lens with local runtime and AWS ECS Fargate deployment.
 
-Hardware Form Factor
-
-Future wearable could be:
+## Architecture (MVP)
+
+- **API**: FastAPI service handling session + audio chunk ingestion.
+- **Storage**: local filesystem for chunk files (`data/uploads/...`) and SQLite for metadata.
+- **Async placeholder pipeline**: uploaded chunk status flows `uploaded -> queued -> processed` using FastAPI background tasks.
+- **Deployment**: GitHub Actions -> ECR (`memory-lens-api`) -> ECS Fargate service (`memory-lens-backend-service`) on cluster (`memory-lens-cluster`) in region `ap-south-1`.
 
-magnetic clip
-smart button
-pendant
-wearable mic
-pen
+## API Endpoints
 
-BUT:
-small
-minimal
-fashionable
-lightweight
-non-bulky
+- `GET /healthz` -> health response.
+- `POST /v1/sessions` -> create session (`session_id`, `created_at`).
+- `POST /v1/sessions/{session_id}/chunks` -> multipart chunk upload (`file`, `start_ms`, `end_ms`, `source`, `device_id?`).
+- `GET /v1/sessions/{session_id}` -> session details + chunks.
 
-HARDWARE PURPOSE
+## Local Development
 
-ONLY:
+### 1) Environment
 
-capture audio
-reduce friction
-sync automatically
-act as passive memory sensor
-HARDWARE SHOULD NOT:
+```bash
+cp .env.example .env
+```
 
-❌ run AI
-❌ run LLMs
-❌ summarize
-❌ have screen
-❌ heavy compute
+### 2) Run with Docker Compose
 
-Reason:
+```bash
+docker compose up --build
+```
 
-battery
-heat
-size
-cost
-HARDWARE ARCHITECTURE
-Components
-Component	Purpose
-Nordic BLE chip	low-power connectivity
-dual MEMS microphones	directional audio
-small battery	all-day usage
-local flash buffer	temporary storage
-BLE sync	phone communication
-HARDWARE WORKFLOW
-Wearable
-↓
-Captures lecture audio
-↓
-Streams/syncs to phone
-↓
-Phone sends to backend
-↓
-AI processing
-↓
-User gets notes automatically
-2. MOBILE APP LAYER
+API will be available at `http://localhost:8000`.
 
-(The User Interaction Layer)
+Health check:
 
-THIS is your actual product interface.
+```bash
+curl http://localhost:8000/healthz
+```
 
-APP RESPONSIBILITIES
-A. Device Sync
-connect wearable
-receive audio chunks
-background sync
-B. Session Management
+### 3) Run tests/lint locally
 
-Everything is session-based.
+```bash
+make install
+make lint
+make test
+```
 
-Example:
+## AWS ECS/Fargate Deployment Checklist (OIDC)
 
-lecture_session_001
-C. User Dashboard
+### Required fixed deployment values
 
-Shows:
+- AWS Region: `ap-south-1`
+- ECR Repository: `memory-lens-api`
+- ECS Cluster: `memory-lens-cluster`
+- ECS Service: `memory-lens-backend-service`
+- Domain: none
 
-lectures
-notes
-flashcards
-searchable memory
-D. Review Experience
+### One-time AWS setup
 
-User can:
+- [ ] Create ECR repository `memory-lens-api` in `ap-south-1`.
+- [ ] Create ECS cluster `memory-lens-cluster`.
+- [ ] Create (or prepare) ECS Fargate service `memory-lens-backend-service` wired to target group/networking.
+- [ ] Create CloudWatch log group `/ecs/memory-lens-backend-service`.
+- [ ] Create task execution role (`ecsTaskExecutionRole`) and application task role.
+- [ ] Update `.aws/task-definition.json` placeholders (`<AWS_ACCOUNT_ID>`, `<FRONTEND_ORIGINS>`), role ARNs, and any env/logging values as needed (`ALLOWED_ORIGINS` should be real frontend origins in production).
+- [ ] Review `.aws/task-definition.json` compute defaults (`cpu: 256`, `memory: 512`) and increase them based on expected workload.
 
-revise
-search lectures
-ask questions
-revisit concepts
-3. BACKEND LAYER
+### GitHub OIDC setup
 
-(The Intelligence Layer)
+1. In IAM, add GitHub OIDC provider (`token.actions.githubusercontent.com`) if not already present.
+2. Create IAM role for GitHub Actions deployment (example trust policy below).
+3. Attach permissions allowing ECR push and ECS deploy actions.
+4. In GitHub repo secrets, set:
+   - `AWS_ROLE_TO_ASSUME` = deployment role ARN.
 
-THIS is the real core.
+Example trust policy (replace placeholders):
 
-BACKEND RESPONSIBILITIES
-A. Audio Ingestion
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:dsr5k/memory-lens:*"
+        }
+      }
+    }
+  ]
+}
+```
 
-Accepts audio from:
+## GitHub Actions Workflows
 
-uploads
-wearable
-future classroom nodes
-IMPORTANT
+- **CI** (`.github/workflows/ci.yml`): lint, unit tests, Docker build.
+- **Deploy** (`.github/workflows/deploy-ecs.yml`): OIDC auth -> build/push image to ECR -> render ECS task definition -> deploy to ECS service.
 
-System must NOT care:
-where audio came from.
-
-Only:
-
-audio source → processing pipeline
-B. Transcription
-
-Using:
-Whisper
-
-Handles:
-
-Hindi-English mix
-classroom speech
-noisy environments
-C. Semantic Educational Filtering
-
-MOST IMPORTANT FEATURE.
-
-AI should differentiate between:
-
-actual lecture
-gossip
-jokes
-random chatter
-teacher side-talk
-Example
-Keep:
-
-“Operating systems manage memory.”
-
-Ignore:
-
-“Why are you boys laughing?”
-
-THIS IS YOUR REAL MOAT
-
-Not transcription.
-
-contextual educational intelligence.
-D. Educational Relevance Scoring
-
-Every chunk gets importance score.
-
-Example:
-
-important concept → high score
-random chatter → low score
-E. AI Structuring
-
-Generate:
-
-notes
-summaries
-flashcards
-concepts
-F. Future Memory Engine
-
-Tracks:
-
-weak concepts
-forgotten topics
-revision timing
-learning patterns
-
-THIS becomes your long-term moat.
-
-4. USER EXPERIENCE PHILOSOPHY
-
-MOST IMPORTANT.
-
-The system should feel:
-
-invisible.
-USER SHOULD NEVER:
-manually transfer files
-organize recordings
-upload repeatedly
-
-Everything should:
-
-happen automatically.
-5. REAL PRODUCT FLOW
-Wearable / Upload
-↓
-Session Created
-↓
-Audio Stored
-↓
-Whisper Transcription
-↓
-Semantic Filtering
-↓
-Educational Relevance Detection
-↓
-Summary Generation
-↓
-Flashcard Generation
-↓
-Searchable Memory
-↓
-Revision Loop
-6. WHAT MAKES THIS DIFFERENT
-
-NOT:
-AI note-taking app.
-
-NOT:
-voice recorder.
-
-REAL DIFFERENTIATOR:
-passive contextual learning intelligence.
-7. BIGGEST TECHNICAL CHALLENGES
-A. Audio Quality
-
-Indian classrooms noisy.
-
-B. Battery
-
-Wearable must last full day.
-
-C. Semantic Filtering
-
-Distinguishing:
-
-lectures
-gossip
-jokes
-D. Privacy
-
-Must not feel creepy.
-
-E. Retention
-
-Users must repeatedly use it.
-
-8. PRIVACY PHILOSOPHY
-
-VERY important.
-
-The product should feel:
-
-memory assistant
-
-NOT:
-
-surveillance device
-PRIVACY FEATURES
-visible recording indicator
-session-based recording
-optional raw audio deletion
-encrypted storage
-user ownership
-9. LONG-TERM VISION
-
-This eventually becomes:
-
-human memory infrastructure
-
-Not just education.
-
-FUTURE EXPANSIONS
-Phase 1
-
-Lecture memory
-
-Phase 2
-
-Meeting memory
-
-Phase 3
-
-Founder memory
-
-Phase 4
-
-Life memory assistant
-
-10. MVP GOAL
-
-DO NOT build entire ecosystem now.
-
-ONLY:
-
-Audio
-↓
-Transcript
-↓
-Semantic Filtering
-↓
-Notes
-↓
-Flashcards
-
-That’s your true MVP.
-
-11. IMPORTANT ENGINEERING PRINCIPLE
-
-Everything must remain:
-
-hardware-compatible later.
-
-Meaning:
-backend architecture should already support:
-
-chunk uploads
-wearable sessions
-async sync
-device endpoints
-
-without rewrite later.
-
-12. YOUR REAL COMPANY CATEGORY
-
-NOT:
-EdTech.
-
-NOT:
-hardware startup.
-
-REAL CATEGORY:
-Cognitive augmentation platform.
-
-That’s the true direction.
+Deploy runs on push to `main` (or manually via `workflow_dispatch`).
