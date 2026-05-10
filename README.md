@@ -63,7 +63,7 @@ make test
 - [ ] Create (or prepare) ECS Fargate service `memory-lens-backend-service` wired to target group/networking.
 - [ ] Create CloudWatch log group `/ecs/memory-lens-backend-service`.
 - [ ] Create task execution role (`ecsTaskExecutionRole`) and application task role.
-- [ ] Update `.aws/task-definition.json` role ARNs and any env/logging values as needed.
+- [ ] Update `.aws/task-definition.json` placeholders (`<AWS_ACCOUNT_ID>`), role ARNs, and any env/logging values as needed.
 
 ### GitHub OIDC setup
 
